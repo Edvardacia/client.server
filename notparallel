@@ -1,0 +1,159 @@
+// Работа с сетью
+
+// Каждая из сторон виртуального соединения называется "сокет"
+// Процесс сервер инициализируется при запуске и далее бездействует, ождая поступление запроса от клиента
+// Процесс клиент посылает запрос на установление соединения с сервером, требуя выполнить для него определенную функцию
+
+// Сервер последовательной обработки запросов
+// Сервер паралельной обработки запросов
+
+// Сокет привязывается к порту
+// Сокет конечный пункт передачи данных
+
+// Порядок работы с клиентским сокетом
+// Открытие сокета -> Открытие потока ввода и/или потока вывода для сокета ->
+// -> Чтение и запись в потоки согласно установленному протоколу общения с сервером ->
+// -> Закрытие потоков ввода-вывода -> Закрытие сокета
+
+// Порядок работы с серверным сокетом
+
+try {
+	serverSocket = new ServerSocket(4444);
+} catch (IOException e) {
+	System.out.println("Could not listen on port: 4444");
+	System.exit(-1);
+}
+
+Socket clientSocket = null;
+try {
+	clientSocket = serverSocket.accept();
+} catch (IOException e) {
+	System.out.println("Accept failed: 4444");
+	System.exit(-1);
+}
+
+// Порядок работы Сервера параллельной обработки запросов
+// Установление соединения клиент-сервер -> Сервер параллельной обработки передает управление дочернему процессу ->
+// -> Если во время обработки запроса поступает запрос от другого клиента, сервер параллельной обработки передает управление новому дочернему процессу
+
+public class Server  {
+	private static final String EXIT = "exit";
+	public static final int PORT = 8189;
+
+	public static void main(String[] args) {
+		// Создали сервер
+		try (ServerSocket server = new ServerSocket(PORT)) {
+			// Включили эхо (слушаем запросы) - ожидаем подключение
+			try (Socket s = server.accept()) {
+				// Обрабатываем как входной поток
+				InputStream inputStream = s.getInputStream();
+				// Обрабатываем как выходной поток
+				OutputStream outputStream = s.getOutputStream();
+				// Считываем входной поток
+				try (Scanner in = new Scanner(inputStream)) {
+					// Записываем выходной поток
+					PrintWriter out = new PrintWriter(outputStream, true);
+					out.println("Connect to server");
+					while (true) {
+						// Записываем входной поток в переменную
+						String line = in.nextLine();
+						// Выход из записи. Закрываем сервер
+						// 2 вариант - EXIT.contains(line)
+						if (EXIT.equals(line.trim())) {
+							break;
+						}
+						out.println("server: " + line);
+					}
+				}
+			}
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+}
+
+public class Client extends JFrame {
+	private static final String HOST = "localhost";
+	private final JTextArea jta;
+	private PrintWriter out;
+	private Socket socket;
+	Scanner in;
+
+	public Client() {
+		// Создаем классический графический интерфейс
+		setTitle("Client");
+		setLocation(100, 300);
+		setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
+		setSiza(400, 500);
+		jta = new JTextArea();
+		JScrollPane jsp = new JScrollPane(jta);
+		jsp.setAutoscrolls(true);
+		add(jsp);
+		JButton jbSend = new JButton("SEND");
+		JPanel jp = new JPanel(new BorderLayout());
+		jp.add(jbSend, BorderLayout.EAST);
+		JTextField jtf = new JTextField();
+		jp.add(jtf, BorderLayout.SOUTH);
+		add(jp, BorderLayout.SOUTH);
+
+		jbSend.addActionListener(new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				sendMessage(jtf.getText());
+				jtf.setText("");
+			}
+		});
+
+		addWindowListener(new WindowAdapter() {
+			@Override
+			public void windowClosed(WindowEvent e) {
+				super.windowClosed(e);
+				try {
+					out.println("end");
+					out.close();
+					in.close();
+					socket.close();
+				} catch (IOException e1) {
+					e1.printStackTrace();
+					System.out.println("error");
+				}
+			}
+		});
+		System.out.println("start");
+		startClient();
+		System.out.println("end");
+		setVisible(true);
+	}
+
+	private void sendMessage(String text) {
+		out.println(text);
+		out.flush();
+		jta.append("client: " + text + '\n');
+	}
+
+	public void startClient() {
+		try {
+			socket = new Socket(HOST, Server.PORT);
+			out = new PrintWriter(socket.getOutputStream());
+			in = new Scanner(socket.getInputStream());
+			new Thread(new Runnable() {
+				@Override
+				public void run() {
+					try {
+						while(true) {
+							if (in.hasNextLine()) {
+								String line = in.nextLine();
+								jta.append(line + '\n');
+							}
+						} catch (Exception e) {
+							e.printStackTrace();
+							System.out.println("Connect error");
+						}
+					}
+				}
+			}).start();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+}
