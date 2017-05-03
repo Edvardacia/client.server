@@ -1,0 +1,43 @@
+import java.io.IOException;
+import java.net.ServerSocket;
+import java.net.Socket;
+
+/**
+ * Created by QuantCapital on 03.05.2017.
+ */
+public class Server {
+    private static final String EXIT = "exit";
+    public static final int PORT = 8189;
+    // Создаем пустую ссылку на сервер
+    private static ServerSocket server = null;
+    // Создаем пустую ссылку на сокет
+    private static Socket s = null;
+
+    public static void main(String[] args) {
+        try {
+            // Запускаем сервер на прослушивание порта 8189
+            server = new ServerSocket(PORT);
+            System.out.println("Сервер запущен. Ожидание клиентов...");
+        while (true) {
+            // как только клиент подключился, создаем сокет (соединение)
+            s = server.accept();
+            System.out.println("Клиент подключился");
+            // в отдельном потоке запускаем обработчик этого клиента
+            new Thread(new ClientHandler(s)).start();
+        }
+    }
+        catch (IOException e) {
+            e.printStackTrace();
+        }
+        finally {
+            try {
+                server.close();
+                System.out.println("Server closed");
+                s.close();
+            }
+            catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+}
